@@ -1,0 +1,7 @@
+# compiled binaries
+obj/*
+dice
+
+# editor aux files
+*.kdev4
+.kate-swp
