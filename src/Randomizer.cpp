@@ -8,6 +8,7 @@
 #include <iostream>
 #include <functional>
 #include <memory>
+#include <sstream>
 
 // TODO move to utils.cpp
 auto mirror(size_t n) -> size_t {
@@ -171,9 +172,8 @@ auto Randomizer::roll_dice(const std::string& dice_str) -> int
     std::cout << "*** rolling the dice ***" << std::endl;
     for (size_t i {0}; i < elements.size(); ++i) {
         if(elements[i]->type == et_dice) {
+            std::stringstream buf;
             Element_dice* dice = static_cast<Element_dice*>(elements[i].get());
-            std::cout << i+1 << ": " << dice->n << "d" << dice->sides
-            << std::endl;
             
             // roll the dice
             std::uniform_int_distribution<std::mt19937::result_type> dist(
@@ -181,13 +181,16 @@ auto Randomizer::roll_dice(const std::string& dice_str) -> int
             int total {0};
             for (size_t j {0}; j < dice->n; ++j) {
                 int res = dist(this->rng);
-                std::cout << "d#" << j+1 << ": " << res << std::endl;
                 total += res;
+
+                buf << res;
+                if (j < dice->n -1) { buf << " "; } // don't put trailing space
             }
-            std::cout << "total: " << total << "\n"
-            << "----------------------------------------" << std::endl;
+
+            std::cout << dice->n << "d" << dice->sides << " = " << total
+            << " (" << buf.str() << ")" << std::endl;
             
-            // replacing diceroll with it's result, for next pass
+            // replacing diceroll element with result numeric val, for next pass
             elements[i] = std::unique_ptr<Element_num>(new Element_num(total));
         }
     }

@@ -4,4 +4,5 @@ dice
 
 # editor aux files
 *.kdev4
-.kate-swp
+*.vscode
+*.kate-swp
