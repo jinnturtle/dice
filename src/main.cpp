@@ -28,7 +28,7 @@ auto main(int argc, char** argv) -> int
     
     std::cout
     << "----------------------------------------\n"
-    << "total: " << result << std::endl;
+    << "grand total: " << result << std::endl;
     
     return 0;
 }

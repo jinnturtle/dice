@@ -2,12 +2,12 @@
 
 Features::
 * [x] Roll any amount of any-sided dice via notation `<no of dice>d<no of sides>` e.g. `3d6`, `1d20`.
-* Default shorthand notations:
 * Modifiers via `-`, `+` e.g. `2d6-2` gives results `0 through 10`.
 * [x] Integer arguments to modifiers.
-* [ ] Dice notation arguments to modifiers.
+* [x] Dice notation arguments to modifiers.
+* Default shorthand notations:
 ** [ ] `D` = `d6`
-** [ ] If amount of dice is not given, assume 1 dice.
+** [x] If amount of dice is not given, assume 1 dice.
 * [ ] Verbose and silent modes i.e. display result of each die rolled.
 * Advanced rolls:
 ** [ ] Flux e.g. `2d6` results `-5 through +5` (used in Traveller5)
