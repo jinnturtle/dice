@@ -138,6 +138,7 @@ auto Randomizer::roll_dice(const std::string& dice_str) -> int
             if (ch == num_end) { break; }
             ch = num_end;
             
+            if (num1 == 0) { num1 = 1; } // default to 1
             elements.push_back(
                 std::unique_ptr<Element_dice>(new Element_dice(num1, num2)));
             
