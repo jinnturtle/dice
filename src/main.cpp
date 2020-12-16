@@ -10,7 +10,14 @@ auto main(int argc, char** argv) -> int
     std::string dice_str;
     
     for (int i {1}; i < argc; ++i) {
-        std::cout << "arg " << i << ": " << argv[i] << std::endl;
+        if (argc > 2) {
+            std::cout
+            << "WARNING: multiple command handling not implemented yet"
+            << std::endl;
+            
+            std::cout << "command " << i << ": " << argv[i] << std::endl;
+        }
+
         if (argv[i][0] == '-') {
             std::cout << "sorry, args processing not implemented yet"
             << std::endl;
