@@ -1,22 +1,41 @@
 = Dice
 
 Features::
-* [x] Roll any amount of any-sided dice via notation `<no of dice>d<no of sides>` e.g. `3d6`, `1d20`.
-* [x] Modifiers via `-`, `+`, `*`, `/` e.g. `2d6-2` gives results `0 through 10`.
+* [x] Roll any amount of any-sided dice via notation
+`<no of dice>d<no of sides>` e.g. `3d6`, `1d20`.
+* [x] Modifiers via `-`, `+`, `*`, `/` e.g. `2d6-2` gives results
+`0 through 10`.
 * [x] Integer arguments to modifiers.
-* [x] Dice notation arguments to modifiers.
-* Default shorthand notations:
+* Shorthand notations:
 ** [ ] `D` = `d6`
-** [x] If amount of dice is not given, assume 1 dice.
-* [ ] Verbose and silent modes i.e. display result of each die rolled.
-* Advanced rolls:
-** [ ] Flux e.g. `2d6` results `-5 through +5` (used in Traveller5)
-** [ ] Negative Flux e.g. `2d6` results `-5 through 0` (used in Traveller5)
-** [ ] Positive Flux e.g. `2d6` results `0 through +5` (used in Traveller5)
-** [ ] Success threshold e.g. diceroll with threshold `7` will produce `success`
-point every time a dice rolls a score of `7` or above.
-** [ ] Success and fail threshold: in addition to the success threshold, each dice
-rolled will produce a `failure` point if it rolls below or at the fail
-threshold. (used in Vampire: The Masquerade 5th edition)
+* [ ] Verbose and silent modes i.e. display result of each die rolled or just
+the resulting score.
 * [ ] Show probability for simple dice notations i.e. `<ammount>d<sides>`.
 * [ ] Test dice rolls and display statistics.
+
+Ideas:
+* Flux dice
+** [ ] Flux e.g. `2d6` results `-5 through +5` (used in Traveller5).
+Something like `fx6` would result in `1d6 - 1d6`
+** [ ] Negative Flux e.g. `2d6` results `-5 through 0` (used in Traveller5).
+Something like `fn6` would result in the smaller outcome subtracted from larger
+outcome.
+** [ ] Positive Flux e.g. `2d6` results `0 through +5` (used in Traveller5)
+Something like `fp6` would result in larger outcome subtracted from smaller
+outcome.
+
+* Success/failure Thresholds
+** [ ] Success threshold e.g. diceroll with threshold `7` will produce `success`
+point every time a dice rolls a score of `7` or above.  e.g. `2d10s7`
+** [ ] Success and fail threshold: in addition to the success threshold, each
+dice rolled will produce a `failure` point if it rolls below or at the fail
+threshold. e.g. `2d6s6f1` (used in Vampire: The Masquerade 5th edition, Year
+Zero engine (e.g.  Alien RPG, Mutant Year Zero, Coriolis))
+** These could also be solved via custom dice notations 
+
+* Custom dice notations (i.e. arrays of values) e.g. `3d[-, 0, +]` for "fate"
+dice or `2d[0, 2, 4, 6, 8, 10]` for +2 sequence starting at 0, or `6d[fail, 0,
+0, 0, 0, win]` where there is 1/6 chance to fail and 1/6 to win as e.g. in Year
+Zero system, the possibilities woudl be quite broad, arrays with non-numeric
+values would be considered all-string values, can display no of each value in
+score statistics or something.

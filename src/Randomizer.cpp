@@ -21,17 +21,22 @@ using Elements_t = std::list<std::unique_ptr<Element>>;
 
 auto get_surrounding_nums(Elements_t* const list, Elements_t::iterator it)
     -> std::tuple<Element*, Element*>;
+auto print_elements(Elements_t* const elements) -> std::stringstream;
 
 // parses the dice notation string and returns array of operable elements
 auto parse_dice_str(const std::string& dice_str) -> Elements_t;
-// resolves the dice elements and replaces them with resulting random value
+// resolves the dice operator and replaces them with resulting random value
 auto resolve_dice(Elements_t* const elements, std::mt19937* const rng) -> void;
+// resolves the division and multiplicaiton, and replaces them with result vals
+auto resolve_divmult(Elements_t* const elements) -> void;
+// resolves the addition and subtraction ops, and replaces them with result vals
+auto resolve_addsub(Elements_t* const elements) -> void;
 /* Performs arithmetic operation with elements and returns result, the only
  * element types supported by this operation are numbers and arithmetic
  * operators.*/
 auto get_total(Elements_t* const elements) -> int64_t;
 // roll n amount of sided dice and return result total
-auto roll_dice(int n, int sides,
+auto roll_dice(unsigned n, unsigned sides,
     std::mt19937* const rng, std::stringstream& buf) -> int;
 
 Randomizer::Randomizer()
@@ -41,9 +46,9 @@ Randomizer::Randomizer()
 enum Symbol : char {
     sym_dice = 'd',
     sym_mult = '*',
-    sym_divis = '/',
+    sym_div = '/',
     sym_add = '+',
-    sym_substr = '-'
+    sym_sub = '-'
 };
 
 enum Element_type {
@@ -102,9 +107,16 @@ auto Randomizer::process(const std::string& dice_str) -> int64_t
     // TODO implement some error detection
     Elements_t elements = parse_dice_str(dice_str);
     resolve_dice(&elements, &this->rng);
-    int64_t grand_total { get_total(&elements) };
+    resolve_divmult(&elements);
+    resolve_addsub(&elements);
 
-    return grand_total;
+    if (elements.size() != 1) {
+        std::cerr << "ERROR: sequence not fully processed, " << elements.size()
+        << " elements remaining" << std::endl;
+        return 0;
+    }
+
+    return static_cast<Element_num*>(elements.front().get())->i;
 }
 
 auto Randomizer::roll_range(int min, int max) -> int
@@ -149,9 +161,9 @@ auto parse_dice_str(const std::string& dice_str) -> Elements_t
         switch (*ch) {
         case sym_dice:
         case sym_mult:
-        case sym_divis:
+        case sym_div:
         case sym_add:
-        case sym_substr:
+        case sym_sub:
             elements.push_back(
                 std::unique_ptr<Element_op>(new Element_op(*ch)));
             ++ch;
@@ -164,7 +176,7 @@ auto parse_dice_str(const std::string& dice_str) -> Elements_t
 
 auto resolve_dice(Elements_t* const elements, std::mt19937* const rng) -> void
 {
-    if (elements == nullptr || rng == nullptr) {
+    if (!elements || !rng) {
         std::cerr << "ERROR: null arguments to " << __func__ << " function"
         << std::endl;
         return;
@@ -202,9 +214,92 @@ auto resolve_dice(Elements_t* const elements, std::mt19937* const rng) -> void
     }
 }
 
+auto resolve_divmult(Elements_t *const elements) -> void
+{
+    if (!elements) {
+        std::cerr << "ERROR: null arguments to " << __func__ << " function"
+        << std::endl;
+        return;
+    }
+
+    for (auto it {(*elements).begin()}; it != (*elements).end(); ++it) {
+        if((*it)->type != et_op) { continue; }
+
+        Element_op* op =
+            static_cast<Element_op*>((*it).get());
+        if (op->symb != sym_div && op->symb != sym_mult) { continue; }
+
+        // operator must have two integer elements surrounding it
+        auto [prev_el, next_el] = get_surrounding_nums(elements, it);
+        if (!prev_el || !next_el) {
+            std::cerr << "ERROR: arith. operators must be surrounded by ints"
+            << std::endl;
+            return;
+        }
+
+        int a {static_cast<Element_num*>(prev_el)->i};
+        int b {static_cast<Element_num*>(next_el)->i};
+        int res {0};
+
+        if (op->symb == sym_div) {
+            res = a/b;
+        } else if (op->symb == sym_mult) {
+            res = a*b;
+        } else {
+            std::cerr << "ERROR: unexpected operator at " << __func__
+            << std::endl;
+        }
+
+        // the operand and operators can be replaced by result now
+        (*it) = std::unique_ptr<Element_num>(new Element_num(res));
+        elements->erase(std::prev(it));
+        elements->erase(std::next(it));
+    }
+}
+
+auto resolve_addsub(Elements_t *const elements) -> void
+{
+    if (!elements) {
+        std::cerr << "ERROR: null arguments to " << __func__ << " function"
+        << std::endl;
+        return;
+    }
+
+    for (auto it {(*elements).begin()}; it != (*elements).end(); ++it) {
+        if((*it)->type != et_op) { continue; }
+
+        Element_op* op =
+            static_cast<Element_op*>((*it).get());
+        if (op->symb != sym_add && op->symb != sym_sub) { continue; }
+
+        // operator must have two integer elements surrounding it
+        auto [prev_el, next_el] = get_surrounding_nums(elements, it);
+        if (!prev_el || !next_el) {
+            std::cerr << "ERROR: arith. operators must be surrounded by ints"
+            << std::endl;
+            return;
+        }
+
+        int a {static_cast<Element_num*>(prev_el)->i};
+        int b {static_cast<Element_num*>(next_el)->i};
+
+        // replacing dice operator and operands with result numeric value
+        if (op->symb == sym_add) {
+            (*it) = std::unique_ptr<Element_num>(new Element_num(a+b));
+        } else if (op->symb == sym_sub) {
+            (*it) = std::unique_ptr<Element_num>(new Element_num(a-b));
+        } else {
+            std::cerr << "ERROR: unexpected operator at " << __func__
+            << std::endl;
+        }
+        elements->erase(std::prev(it));
+        elements->erase(std::next(it));
+    }
+}
+
 auto roll_dice(
-    int n,
-    int sides,
+    unsigned n,
+    unsigned sides,
     std::mt19937* const rng,
     std::stringstream& buf) -> int
 {
@@ -222,62 +317,6 @@ auto roll_dice(
     return total;
 }
 
-/* TODO Here multiplication and division does not adhere to the correct
- * mathematical precedence, consider removing as these operation are not all
- * that common in tabletop games. */
-auto get_total(Elements_t* const elements) -> int64_t
-{
-    int64_t res {0};
-
-    Element_op start_op('+');
-    Element_op* op {&start_op};
-    int buf {0};
-    std::stringstream ss;
-    for (auto it {elements->begin()}; it != elements->end(); it++) {
-        Element_type type = (*it)->type;
-
-        if(type == et_num) {
-            buf = static_cast<Element_num*>(it->get())->i;
-            ss << buf;
-
-            if (op) {
-                switch(op->symb) {
-                    case sym_add: res += buf; break;
-                    case sym_substr: res -= buf; break;
-                    case sym_mult: res *= buf; break;
-                    case sym_divis: res /= buf; break;
-                    default:
-                        std::cerr << "ERROR: op " << op->symb
-                        << " not supported in " << __func__ << std::endl;
-                        return res;
-                }
-                op = nullptr;
-            } else {
-                std::cerr << "ERROR: operator should precede operand"
-                << std::endl;
-                return res;
-            }
-        } else if (type == et_op) {
-            op = static_cast<Element_op*>(it->get());
-            ss << op->symb;
-        } else {
-            std::cerr << "ERROR: function " << __func__
-            << " does not support element type " << type << " at this moment"
-            << std::endl;
-        }
-
-        ss << " "; // putting space between elements for readability
-
-        // print string if last element
-        if (std::next(it) == elements->end()) {
-            ss << "= " << res;
-            std::cout << ss.str() << std::endl;
-        }
-    }
-
-    return res;
-}
-
 auto get_surrounding_nums(Elements_t* const list, Elements_t::iterator it)
     -> std::tuple<Element*, Element*>
 {
@@ -292,4 +331,33 @@ auto get_surrounding_nums(Elements_t* const list, Elements_t::iterator it)
     }
 
     return {std::prev(it)->get(), std::next(it)->get()};
+}
+
+auto print_elements(Elements_t* const elements) -> std::stringstream
+{
+    std::stringstream buf;
+
+    for (auto it {elements->begin()}; it != elements->end(); ++it) {
+        Element* e {it->get()};
+        switch (e->type) {
+            case et_num:
+                buf << static_cast<Element_num*>(e)->i;
+                break;
+            case et_op:
+                buf << static_cast<Element_op*>(e)->symb;
+                break;
+            case et_undefined:
+                buf << "[undefined]";
+                break;
+            default:
+                buf << "?";
+                break;
+        }
+
+        if (std::next(it) != elements->end()) {
+            buf << " "; // separating from next element
+        }
+    }
+
+    return buf;
 }
