@@ -14,6 +14,7 @@ the resulting score.
 * [ ] Test dice rolls and display statistics.
 
 Ideas:
+
 * Flux dice
 ** [ ] Flux e.g. `2d6` results `-5 through +5` (used in Traveller5).
 Something like `fx6` would result in `1d6 - 1d6`
