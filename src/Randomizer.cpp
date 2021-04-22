@@ -4,18 +4,23 @@
 #include <cmath>
 #include <cstdlib>
 #include <array>
-#include <vector>
+#include <list>
+#include <iterator>
 #include <iostream>
 #include <functional>
 #include <memory>
 #include <sstream>
+#include <tuple>
 
 struct Element;
 
-using Elements_t = std::vector<std::unique_ptr<Element>>;
+using Elements_t = std::list<std::unique_ptr<Element>>;
 
 /* TODO Encapsulating Element class and children and related functions might be
  * a good idea. */
+
+auto get_surrounding_nums(Elements_t* const list, Elements_t::iterator it)
+    -> std::tuple<Element*, Element*>;
 
 // parses the dice notation string and returns array of operable elements
 auto parse_dice_str(const std::string& dice_str) -> Elements_t;
@@ -25,6 +30,9 @@ auto resolve_dice(Elements_t* const elements, std::mt19937* const rng) -> void;
  * element types supported by this operation are numbers and arithmetic
  * operators.*/
 auto get_total(Elements_t* const elements) -> int64_t;
+// roll n amount of sided dice and return result total
+auto roll_dice(int n, int sides,
+    std::mt19937* const rng, std::stringstream& buf) -> int;
 
 Randomizer::Randomizer()
 : rng{std::mt19937(this->dev())}
@@ -32,15 +40,14 @@ Randomizer::Randomizer()
 
 enum Symbol : char {
     sym_dice = 'd',
-    sym_add = '+',
-    sym_substr = '-',
     sym_mult = '*',
-    sym_divis = '/'
+    sym_divis = '/',
+    sym_add = '+',
+    sym_substr = '-'
 };
 
 enum Element_type {
     et_undefined = 0,
-    et_dice,        // dice element e.g. 3d10
     et_op,          // operator element e.g. +, -
     et_num          // number element e.g. 5
 };
@@ -50,49 +57,35 @@ struct Element {
     Element(Element_type type)
     :type{type}
     {};
-    
+
+    std::string get_type_str();
+
     Element_type type;
 };
 
-class Element_dice final: public Element {
-public:
-    Element_dice(const std::string& str, size_t pos);
-    Element_dice(size_t dice_n, size_t sides_n);
-
-    ~Element_dice(){};
-    
-    size_t n; // ammount of dice
-    size_t sides; // how many sides each die has
-};
-
-Element_dice::Element_dice(size_t n, size_t sides)
-: Element(et_dice)
-, n{n}
-, sides{sides}
-{}
+std::string Element::get_type_str() {
+    switch(this->type) {
+        case et_num:
+            return "number"; // TODO "integer value" would prob make more sense
+            break;
+        case et_op:
+            return "arithmetic operator";
+            break;
+        case et_undefined:
+            return "undefined";
+            break;
+        default:
+            return "unknown";
+            break;
+    }
+}
 
 struct Element_op: public Element {
     Element_op(const char symb)
     : Element(et_op)
     , symb{symb}
-    {
-        switch(symb){
-        case sym_add:
-            this->f = [](int a, int b) -> int {return a+b;};
-            break;
-        case sym_substr:
-            this->f = [](int a, int b) -> int {return a-b;};
-            break;
-        case sym_mult:
-            this->f = [](int a, int b) -> int {return a*b;};
-            break;
-        case sym_divis:
-            this->f = [](int a, int b) -> int {return a/b;};
-            break;
-        }
-    };
-    
-    std::function<int(int, int)> f;
+    {}
+
     char symb; // the char symbol that represents the operator (e.g. '+', '-')
 };
 
@@ -100,30 +93,29 @@ struct Element_num: public Element {
     Element_num(int i)
     : Element(et_num), i{i}
     {};
-    
+
     int i;
 };
 
-auto Randomizer::roll_dice(const std::string& dice_str) -> int64_t
+auto Randomizer::process(const std::string& dice_str) -> int64_t
 {
     // TODO implement some error detection
     Elements_t elements = parse_dice_str(dice_str);
     resolve_dice(&elements, &this->rng);
-    int64_t grand_total { get_total(&elements) };   
-    
+    int64_t grand_total { get_total(&elements) };
+
     return grand_total;
 }
 
 auto Randomizer::roll_range(int min, int max) -> int
 {
-    // TODO implement a swap function that does not use an intermediary buffer
     if(min > max) {
         int sav_min = min;
         min = max;
         max = sav_min;
     }
     std::uniform_int_distribution<std::mt19937::result_type> dist(min, max);
-    
+
     return dist(this->rng);
 }
 
@@ -133,46 +125,33 @@ auto parse_dice_str(const std::string& dice_str) -> Elements_t
 
     const char* ch {&dice_str.front()};
     const char* end {&dice_str.back()};
-    long num1 {0};
-    long num2 {0};
+    long num {0};
     while (ch <= end) {
         // skip spaces
         if (*ch == ' ') {
             ++ch;
             continue;
         }
-        
+
         // just read the number if it's a digit
         if (isdigit(*ch)) {
             char* num_end;
-            num1 = strtol(ch, &num_end, 10);
-            
+            num = strtol(ch, &num_end, 10);
+
             if (ch == num_end) { break; }
             ch = num_end;
-        }
-        
-        if (*ch == sym_dice) {
-            ++ch;
-            
-            char* num_end;
-            num2 = strtol(ch, &num_end, 10);
-            
-            if (ch == num_end) { break; }
-            ch = num_end;
-            
-            if (num1 == 0) { num1 = 1; } // default to 1
+
             elements.push_back(
-                std::unique_ptr<Element_dice>(new Element_dice(num1, num2)));
-        } else {
-            elements.push_back(
-                std::unique_ptr<Element_num>(new Element_num(num1)));
+                std::unique_ptr<Element_num>(new Element_num(num)));
+            continue;
         }
-        
+
         switch (*ch) {
-        case sym_add:
-        case sym_substr:
+        case sym_dice:
         case sym_mult:
         case sym_divis:
+        case sym_add:
+        case sym_substr:
             elements.push_back(
                 std::unique_ptr<Element_op>(new Element_op(*ch)));
             ++ch;
@@ -191,32 +170,56 @@ auto resolve_dice(Elements_t* const elements, std::mt19937* const rng) -> void
         return;
     }
 
-    for (size_t i {0}; i < (*elements).size(); ++i) {
-        if((*elements)[i]->type == et_dice) {
-            std::stringstream buf;
-            Element_dice* dice =
-                static_cast<Element_dice*>((*elements)[i].get());
-            
-            // roll the dice
-            std::uniform_int_distribution<std::mt19937::result_type> dist(
-                1, dice->sides);
-            int total {0};
-            for (size_t j {0}; j < dice->n; ++j) {
-                int res = dist(*rng);
-                total += res;
+    for (auto it {(*elements).begin()}; it != (*elements).end(); ++it) {
+        if((*it)->type != et_op) { continue; }
 
-                buf << res;
-                if (j < dice->n - 1) { buf << " "; } // don't put trailing space
-            }
+        Element_op* op =
+            static_cast<Element_op*>((*it).get());
+        if (op->symb != sym_dice) { continue; }
 
-            std::cout << dice->n << "d" << dice->sides << " = " << total
-            << " (" << buf.str() << ")" << std::endl;
-            
-            // replacing diceroll element with result numeric value
-            (*elements)[i] = 
-                std::unique_ptr<Element_num>(new Element_num(total));
+        // dice operator must have two integer elements surrounding it
+        auto [prev_el, next_el] = get_surrounding_nums(elements, it);
+        if (!prev_el || !next_el) {
+            std::cerr << "ERROR: dice operator must be surrounded by ints"
+            << std::endl;
+            return;
         }
+
+        int amt {static_cast<Element_num*>(prev_el)->i};
+        int sides {static_cast<Element_num*>(next_el)->i};
+
+        // roll the dice
+        std::stringstream buf;
+        int total {roll_dice(amt, sides, rng, buf)};
+
+        std::cout << amt << "d" << sides << " = " << total
+        << " (" << buf.str() << ")" << std::endl;
+
+        // replacing dice operator and operands with result numeric value
+        elements->erase(std::prev(it));
+        (*it) = std::unique_ptr<Element_num>(new Element_num(total));
+        elements->erase(std::next(it));
     }
+}
+
+auto roll_dice(
+    int n,
+    int sides,
+    std::mt19937* const rng,
+    std::stringstream& buf) -> int
+{
+    std::uniform_int_distribution<std::mt19937::result_type> dist(1, sides);
+
+    int total {0};
+    for (size_t j {0}; j < n; ++j) {
+        int res = dist(*rng);
+        total += res;
+
+        buf << res;
+        if (j < n - 1) { buf << " "; } // don't put trailing space
+    }
+
+    return total;
 }
 
 /* TODO Here multiplication and division does not adhere to the correct
@@ -226,24 +229,36 @@ auto get_total(Elements_t* const elements) -> int64_t
 {
     int64_t res {0};
 
-    Element_op* op {nullptr};
+    Element_op start_op('+');
+    Element_op* op {&start_op};
     int buf {0};
     std::stringstream ss;
-    for (size_t i {0}; i < (*elements).size(); ++i) {
-        Element_type type = (*elements)[i]->type;
-        
+    for (auto it {elements->begin()}; it != elements->end(); it++) {
+        Element_type type = (*it)->type;
+
         if(type == et_num) {
-            buf = static_cast<Element_num*>((*elements)[i].get())->i;
+            buf = static_cast<Element_num*>(it->get())->i;
             ss << buf;
-            
+
             if (op) {
-                res = op->f(res, buf);
+                switch(op->symb) {
+                    case sym_add: res += buf; break;
+                    case sym_substr: res -= buf; break;
+                    case sym_mult: res *= buf; break;
+                    case sym_divis: res /= buf; break;
+                    default:
+                        std::cerr << "ERROR: op " << op->symb
+                        << " not supported in " << __func__ << std::endl;
+                        return res;
+                }
                 op = nullptr;
             } else {
-                res += buf;
+                std::cerr << "ERROR: operator should precede operand"
+                << std::endl;
+                return res;
             }
         } else if (type == et_op) {
-            op = static_cast<Element_op*>((*elements)[i].get());
+            op = static_cast<Element_op*>(it->get());
             ss << op->symb;
         } else {
             std::cerr << "ERROR: function " << __func__
@@ -254,11 +269,27 @@ auto get_total(Elements_t* const elements) -> int64_t
         ss << " "; // putting space between elements for readability
 
         // print string if last element
-        if (i+1 >= (*elements).size()) {
+        if (std::next(it) == elements->end()) {
             ss << "= " << res;
             std::cout << ss.str() << std::endl;
         }
     }
 
     return res;
+}
+
+auto get_surrounding_nums(Elements_t* const list, Elements_t::iterator it)
+    -> std::tuple<Element*, Element*>
+{
+    if (it == list->begin() || std::next(it) == list->end()) {
+        return {nullptr, nullptr};
+    }
+
+    Element* prev_el {std::prev(it)->get()};
+    Element* next_el {std::next(it)->get()};
+    if (prev_el->type != et_num || next_el->type != et_num) {
+        return {nullptr, nullptr};
+    }
+
+    return {std::prev(it)->get(), std::next(it)->get()};
 }

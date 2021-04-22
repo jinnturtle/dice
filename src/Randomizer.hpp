@@ -7,10 +7,10 @@
 class Randomizer final {
 public:
     Randomizer();
-    
-    auto roll_dice(const std::string& dice_str) -> int64_t;
+
+    auto process(const std::string& dice_str) -> int64_t;
     auto roll_range(int min, int max) -> int;
-    
+
 private:
     std::random_device dev;
     std::mt19937 rng;
